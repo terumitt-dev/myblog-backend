@@ -265,6 +265,12 @@ class Blog < ApplicationRecord
     }
   end
 
+  # フロントエンドの記事詳細ページの公開URL（X連携でツイートに含めるURL）
+  def public_url
+    host = ENV.fetch("APP_HOST", "localhost:3000")
+    "https://#{host}/posts/#{id}"
+  end
+
   # content内の外部画像をダウンロードしてActive Storageに保存し、URLを書き換える
   def rewrite_external_images!(html)
     return html if html.blank?

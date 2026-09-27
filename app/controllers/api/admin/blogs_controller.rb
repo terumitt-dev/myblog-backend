@@ -4,7 +4,7 @@ module Api
   module Admin
     class BlogsController < ApplicationController
       before_action :authenticate_admin!
-      before_action :set_blog, only: [:show, :update, :destroy]
+      before_action :set_blog, only: %i[show update destroy tweet]
 
       # GET /api/admin/blogs
       def index
@@ -54,6 +54,8 @@ module Api
         @blog.content = sanitize_blog_content(@blog.content)
 
         if @blog.save
+          enqueue_tweet_notification(@blog.id)
+
           render json: {
             id: @blog.id,
             title: @blog.title,
@@ -71,8 +73,8 @@ module Api
       # PUT/PATCH /api/admin/blogs/:id
       def update
         sanitized_params = blog_params.to_h
-        if sanitized_params.key?("content")
-          sanitized_params["content"] = sanitize_blog_content(sanitized_params["content"])
+        if sanitized_params.key?('content')
+          sanitized_params['content'] = sanitize_blog_content(sanitized_params['content'])
         end
         if @blog.update(sanitized_params)
           render json: {
@@ -98,6 +100,23 @@ module Api
         else
           render json: { errors: @blog.errors.full_messages }, status: :unprocessable_entity
         end
+      end
+
+      # POST /api/admin/blogs/:id/tweet
+      # 自動ツイート (TweetNotificationJob) が失敗した場合の手動リトライ用。
+      # 管理画面のボタン押下からその場で成否を返せるよう、ジョブを経由せず
+      # DispatchClient を同期呼び出しする。
+      def tweet
+        result = DispatchClient.post_tweet(title: @blog.title, url: @blog.public_url)
+        render json: { tweet_id: result['tweet_id'] }, status: :ok
+      rescue DispatchClient::ConfigurationMissing => e
+        Rails.logger.info("Api::Admin::BlogsController#tweet: dispatch not configured: #{e.message}")
+        render json: { error: 'X connection is not configured' }, status: :service_unavailable
+      rescue DispatchClient::RequestFailed => e
+        Rails.logger.error(
+          "Api::Admin::BlogsController#tweet: failed to post tweet (blog_id=#{@blog.id}): #{e.message}"
+        )
+        render json: { error: 'Failed to post tweet' }, status: :bad_gateway
       end
 
       # POST /api/admin/blogs/import_mt
@@ -152,7 +171,7 @@ module Api
       def set_blog
         @blog = Blog.find(params[:id])
       rescue ActiveRecord::RecordNotFound
-        return render json: { error: 'Blog not found' }, status: :not_found
+        render json: { error: 'Blog not found' }, status: :not_found
       end
 
       def blog_params
@@ -164,6 +183,20 @@ module Api
           html.to_s,
           tags: Blog::SAFE_TAGS,
           attributes: Blog::SAFE_ATTRIBUTES
+        )
+      end
+
+      # ジョブのエンキュー自体が失敗しても (例: SolidQueue への INSERT が
+      # 一時的な DB 障害で例外になる等)、記事はすでに保存済みなので
+      # create のレスポンスには一切影響させない。X 連携は付加機能であり、
+      # ここで例外を伝播させて 500 を返すと、記事作成は成功しているのに
+      # クライアントが失敗と誤認してリトライし、記事が重複作成されうる。
+      def enqueue_tweet_notification(blog_id)
+        TweetNotificationJob.perform_later(blog_id: blog_id)
+      rescue StandardError => e
+        Rails.logger.error(
+          "Api::Admin::BlogsController#create: failed to enqueue TweetNotificationJob (blog_id=#{blog_id}): " \
+          "#{e.class}: #{e.message}"
         )
       end
     end

@@ -28,6 +28,9 @@ Rails.application.routes.draw do
         collection do
           post :import_mt
         end
+        member do
+          post :tweet
+        end
       end
       resources :images, only: [:create]
     end

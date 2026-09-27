@@ -443,4 +443,27 @@ RSpec.describe Blog, type: :model do
       expect(result).to include('src="https://cdn-ak.f.st-hatena.com/images/test.jpg"')
     end
   end
+
+  describe '#public_url' do
+    let(:blog) { FactoryBot.create(:blog) }
+
+    around do |example|
+      original_app_host = ENV['APP_HOST']
+      example.run
+    ensure
+      ENV['APP_HOST'] = original_app_host
+    end
+
+    it 'APP_HOSTを使って記事詳細ページのURLを組み立てること' do
+      ENV['APP_HOST'] = 'go-lilaregard.com'
+
+      expect(blog.public_url).to eq("https://go-lilaregard.com/posts/#{blog.id}")
+    end
+
+    it 'APP_HOSTが未設定の場合はlocalhost:3000にフォールバックすること' do
+      ENV['APP_HOST'] = nil
+
+      expect(blog.public_url).to eq("https://localhost:3000/posts/#{blog.id}")
+    end
+  end
 end

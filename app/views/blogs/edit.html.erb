@@ -1,8 +1,0 @@
-<div class="edit_content">
-  <h2 class="blog_edit_title"><%= t('views.common.blogs.edit', name: Blog.model_name.human) %></h2>
-    <%= render "form", blog: @blog %>
-    <div class="link">
-      <%= link_to t('views.common.blogs.blog_edit', name: Blog.model_name.human.downcase), @blog %> |
-      <%= link_to t('views.common.blogs.admin_back', name: Admin.model_name.human.downcase), admin_root_path %>
-    </div>
-</div>

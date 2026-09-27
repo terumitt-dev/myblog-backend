@@ -24,6 +24,9 @@ class DispatchClient
   # @return [Hash] myblog-dispatch のレスポンス (例: { "tweet_id" => "..." })
   # @raise [ConfigurationMissing] DISPATCH_BASE_URL / DISPATCH_API_KEY が未設定
   # @raise [RequestFailed] myblog-dispatch が非2xxを返した、または通信に失敗した
+  #
+  # DISPATCH_BASE_URL はスキーム+ホスト(+ポート)のみを想定 (例: "https://dispatch.internal")。
+  # URI.join でパスを "/tweet" に絶対指定するため、末尾にパスを含めても無視される。
   def self.post_tweet(title:, url:)
     base_url, api_key = fetch_config!
 

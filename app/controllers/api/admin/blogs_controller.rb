@@ -54,7 +54,7 @@ module Api
         @blog.content = sanitize_blog_content(@blog.content)
 
         if @blog.save
-          TweetNotificationJob.perform_later(blog_id: @blog.id)
+          enqueue_tweet_notification(@blog.id)
 
           render json: {
             id: @blog.id,
@@ -183,6 +183,20 @@ module Api
           html.to_s,
           tags: Blog::SAFE_TAGS,
           attributes: Blog::SAFE_ATTRIBUTES
+        )
+      end
+
+      # ジョブのエンキュー自体が失敗しても (例: SolidQueue への INSERT が
+      # 一時的な DB 障害で例外になる等)、記事はすでに保存済みなので
+      # create のレスポンスには一切影響させない。X 連携は付加機能であり、
+      # ここで例外を伝播させて 500 を返すと、記事作成は成功しているのに
+      # クライアントが失敗と誤認してリトライし、記事が重複作成されうる。
+      def enqueue_tweet_notification(blog_id)
+        TweetNotificationJob.perform_later(blog_id: blog_id)
+      rescue StandardError => e
+        Rails.logger.error(
+          "Api::Admin::BlogsController#create: failed to enqueue TweetNotificationJob (blog_id=#{blog_id}): " \
+          "#{e.class}: #{e.message}"
         )
       end
     end

@@ -4,7 +4,10 @@ require 'net/http'
 require 'json'
 require 'uri'
 
-# myblog-dispatch (X/Twitter 投稿用マイクロサービス) の POST /tweet を呼び出す。
+# myblog-dispatch (X/Twitter 連携用マイクロサービス) の内部 API を呼び出す。
+#   - POST /tweet            : 記事のツイート
+#   - POST /oauth/connect    : X 連携 (OAuth Authorization Code + PKCE) の認可 URL 発行
+#   - POST /oauth/callback   : X から戻った code / state の転送 (トークン交換・保存)
 #
 # 設計方針:
 # - X 連携はブログ本体が動作するための必須機能ではない (付加機能) ため、
@@ -28,10 +31,30 @@ class DispatchClient
   # DISPATCH_BASE_URL はスキーム+ホスト(+ポート)のみを想定 (例: "https://dispatch.internal")。
   # URI.join でパスを "/tweet" に絶対指定するため、末尾にパスを含めても無視される。
   def self.post_tweet(title:, url:)
+    post_json('/tweet', title: title, url: url)
+  end
+
+  # X 連携を開始し、X の認可画面へ遷移するための URL を発行する。
+  # @return [Hash] 例: { "authorize_url" => "https://twitter.com/i/oauth2/authorize?..." }
+  # @raise [ConfigurationMissing] DISPATCH_BASE_URL / DISPATCH_API_KEY が未設定
+  # @raise [RequestFailed] myblog-dispatch が非2xxを返した、または通信に失敗した
+  def self.start_x_connect
+    post_json('/oauth/connect', {})
+  end
+
+  # X の認可後に戻ってきた code / state を myblog-dispatch に渡し、トークン交換・保存させる。
+  # @return [Hash] 例: { "status" => "connected" }
+  # @raise [ConfigurationMissing] DISPATCH_BASE_URL / DISPATCH_API_KEY が未設定
+  # @raise [RequestFailed] state 不正・期限切れ、X 側のエラー、通信失敗など
+  def self.complete_x_connect(code:, state:)
+    post_json('/oauth/callback', code: code, state: state)
+  end
+
+  def self.post_json(path, payload)
     base_url, api_key = fetch_config!
 
-    uri = URI.join(base_url, '/tweet')
-    response = post(uri, api_key, title: title, url: url)
+    uri = URI.join(base_url, path)
+    response = post(uri, api_key, payload)
     ensure_success!(response)
 
     JSON.parse(response.body)
@@ -40,6 +63,7 @@ class DispatchClient
   rescue StandardError => e
     raise RequestFailed, "#{e.class}: #{e.message}"
   end
+  private_class_method :post_json
 
   def self.fetch_config!
     base_url = ENV.fetch('DISPATCH_BASE_URL', nil)
@@ -60,7 +84,7 @@ class DispatchClient
   end
   private_class_method :ensure_success!
 
-  def self.post(uri, api_key, title:, url:)
+  def self.post(uri, api_key, payload)
     http = Net::HTTP.new(uri.host, uri.port)
     http.use_ssl = (uri.scheme == 'https')
     http.open_timeout = TIMEOUT
@@ -69,7 +93,7 @@ class DispatchClient
     request = Net::HTTP::Post.new(uri.request_uri)
     request['Content-Type'] = 'application/json'
     request['X-Dispatch-Key'] = api_key
-    request.body = { title: title, url: url }.to_json
+    request.body = payload.to_json
 
     http.request(request)
   end

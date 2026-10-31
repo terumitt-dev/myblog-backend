@@ -33,7 +33,9 @@ RSpec.describe 'Api::Admin::XConnections#create', type: :request do
         post '/api/admin/x/connect', headers: { 'Authorization' => token }
 
         set_cookie = response.headers['Set-Cookie']
-        expect(set_cookie).to include('x_connect_state=state-abc')
+        expect(set_cookie).to include('x_connect_state=')
+        # state の値そのものを入れない (暗号化されている)。漏れた認可URLから Cookie を偽造させないため。
+        expect(set_cookie).not_to include('state-abc')
         expect(set_cookie).to include('httponly')
         expect(set_cookie.downcase).to include('samesite=lax')
         expect(set_cookie).to include('path=/api/admin/x')
@@ -46,6 +48,15 @@ RSpec.describe 'Api::Admin::XConnections#create', type: :request do
         post '/api/admin/x/connect', headers: { 'Authorization' => token }
 
         expect(response.headers['Set-Cookie'].to_s).not_to include('x_connect_state')
+      end
+
+      it 'ホスト名の大文字小文字は区別せず許可すること' do
+        allow(DispatchClient).to receive(:start_x_connect)
+          .and_return({ 'authorize_url' => 'https://TWITTER.com/i/oauth2/authorize?state=state-abc' })
+
+        post '/api/admin/x/connect', headers: { 'Authorization' => token }
+
+        expect(response).to have_http_status(:ok)
       end
 
       it 'x.com の認可URLも許可すること' do

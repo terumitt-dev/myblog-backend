@@ -44,7 +44,7 @@ module Api
         return nil unless value.is_a?(String)
 
         uri = URI.parse(value)
-        return nil unless uri.is_a?(URI::HTTPS) && ALLOWED_AUTHORIZE_HOSTS.include?(uri.host)
+        return nil unless uri.is_a?(URI::HTTPS) && ALLOWED_AUTHORIZE_HOSTS.include?(uri.host.to_s.downcase)
 
         state = URI.decode_www_form(uri.query.to_s).to_h['state']
         state.presence

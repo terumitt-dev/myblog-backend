@@ -5,7 +5,7 @@ module Api
   #
   # X からの戻りはブラウザの画面遷移であり、管理画面の JWT (Authorization ヘッダー)
   # を付けられないため、管理者認証 (authenticate_admin!) の対象外にしている。
-  # 認可の正当性は、(1) 連携を開始した管理者のブラウザの Cookie に紐づけた state と
+  # 認可の正当性は、(1) 連携を開始した管理者のブラウザの暗号化 Cookie に紐づけた state と
   # URL の state の一致 (XConnectStateCookie)、(2) myblog-dispatch が検証する state
   # (管理者の連携開始時に発行・5分で失効・使い捨て) と、それに紐づく PKCE の
   # code_verifier で担保される。
@@ -30,13 +30,20 @@ module Api
 
     # X の認可結果を処理し、管理画面に伝える結果 (success / denied / error) を返す。
     def connect_result
-      # Cookie は成否に関わらず使い捨て (取り出しと同時に削除)。
-      bound_state = take_bound_x_connect_state
+      # 連携を開始したブラウザ以外 (Cookie なし・復号不可・state 不一致) からの callback は、
+      # Cookie にも dispatch にも触れずに拒否する。
+      return 'error' unless started_in_this_browser?
+
+      consume_x_connect_state
 
       # 管理者が X の認可画面で「拒否」した場合は error=access_denied が付いて戻る。
       return 'denied' if params[:error].present?
-      return 'error' unless legitimate_callback?(bound_state)
+      return 'error' unless valid_param?(params[:code])
 
+      complete_connection
+    end
+
+    def complete_connection
       DispatchClient.complete_x_connect(code: params[:code], state: params[:state])
       'success'
     rescue DispatchClient::ConfigurationMissing => e
@@ -47,11 +54,9 @@ module Api
       'error'
     end
 
-    # code / state が妥当で、かつ連携を開始したブラウザ (Cookie の state と一致) からの
-    # callback であること。Cookie なし・不一致 (認可URLが漏れた場合など) は dispatch を呼ばない。
-    def legitimate_callback?(bound_state)
-      valid_param?(params[:code]) && valid_param?(params[:state]) &&
-        bound_state_matches?(bound_state, params[:state])
+    # URL の state が、この (連携を開始した) ブラウザの Cookie の state と一致すること。
+    def started_in_this_browser?
+      valid_param?(params[:state]) && bound_state_matches?(bound_x_connect_state, params[:state])
     end
 
     def valid_param?(value)

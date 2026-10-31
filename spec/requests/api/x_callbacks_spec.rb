@@ -3,6 +3,8 @@
 require 'rails_helper'
 
 RSpec.describe 'Api::XCallbacks#show', type: :request do
+  include ActiveSupport::Testing::TimeHelpers
+
   let(:admin) do
     Admin.create!(email: 'admin@example.com', password: 'password123', password_confirmation: 'password123')
   end
@@ -181,6 +183,36 @@ RSpec.describe 'Api::XCallbacks#show', type: :request do
             headers: { 'Cookie' => "x_connect_state=#{tampered}" }
 
         expect(response.location).to eq(admin_url('error'))
+      end
+
+      # ブラウザは期限切れの Cookie を送らないが、攻撃者は古い Cookie を手で付けられる。
+      # サーバー側でも期限 (暗号化ペイロードに埋め込まれた expires_at) を検証して拒否する。
+      it '期限 (5分) を過ぎた Cookie は、ヘッダーに手で付けられても dispatch を呼ばずに error にすること' do
+        start_connect_as_admin('state-123')
+        issued = response.headers['Set-Cookie'][/x_connect_state=([^;]+)/, 1]
+        expect(DispatchClient).not_to receive(:complete_x_connect)
+
+        travel 6.minutes do
+          get '/api/admin/x/callback',
+              params: { code: 'c', state: 'state-123' },
+              headers: { 'Cookie' => "x_connect_state=#{issued}" }
+        end
+
+        expect(response.location).to eq(admin_url('error'))
+      end
+
+      it '期限内の Cookie は、同じようにヘッダーに付けても通ること (上のテストが期限だけで落ちている確認)' do
+        start_connect_as_admin('state-123')
+        issued = response.headers['Set-Cookie'][/x_connect_state=([^;]+)/, 1]
+        allow(DispatchClient).to receive(:complete_x_connect).and_return({ 'status' => 'connected' })
+
+        travel 4.minutes do
+          get '/api/admin/x/callback',
+              params: { code: 'c', state: 'state-123' },
+              headers: { 'Cookie' => "x_connect_state=#{issued}" }
+        end
+
+        expect(response.location).to eq(admin_url('success'))
       end
 
       it 'Cookie の state と URL の state が一致しない場合、dispatch を呼ばずに error にすること' do

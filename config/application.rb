@@ -19,6 +19,11 @@ module Myblog
     # Rack::Attack をミドルウェアに追加（レートリミット）
     config.middleware.use Rack::Attack
 
+    # API モードでは外れている Cookie ミドルウェアを追加する。認証には使わず
+    # (認証は JWT)、X 連携の state をブラウザに紐づける Cookie にだけ使う
+    # (app/controllers/concerns/x_connect_state_cookie.rb)。
+    config.middleware.use ActionDispatch::Cookies
+
     # 日本語をデフォルトのlocaleに設定
     config.i18n.default_locale = :ja
 

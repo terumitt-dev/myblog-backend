@@ -14,7 +14,7 @@ RSpec.describe 'Api::Admin::XConnections#create', type: :request do
     response.headers['Authorization']
   end
 
-  let(:authorize_url) { 'https://twitter.com/i/oauth2/authorize?response_type=code&state=abc' }
+  let(:authorize_url) { 'https://twitter.com/i/oauth2/authorize?response_type=code&state=state-abc' }
 
   describe 'POST /api/admin/x/connect' do
     context '認証されている場合' do
@@ -27,8 +27,29 @@ RSpec.describe 'Api::Admin::XConnections#create', type: :request do
         expect(JSON.parse(response.body)['authorize_url']).to eq(authorize_url)
       end
 
+      it '連携を開始したブラウザに state を HttpOnly / SameSite=Lax の Cookie で紐づけること' do
+        allow(DispatchClient).to receive(:start_x_connect).and_return({ 'authorize_url' => authorize_url })
+
+        post '/api/admin/x/connect', headers: { 'Authorization' => token }
+
+        set_cookie = response.headers['Set-Cookie']
+        expect(set_cookie).to include('x_connect_state=state-abc')
+        expect(set_cookie).to include('httponly')
+        expect(set_cookie.downcase).to include('samesite=lax')
+        expect(set_cookie).to include('path=/api/admin/x')
+      end
+
+      it '不正な認可URLの場合は Cookie を発行しないこと' do
+        allow(DispatchClient).to receive(:start_x_connect)
+          .and_return({ 'authorize_url' => 'https://evil.example.com/x?state=abc' })
+
+        post '/api/admin/x/connect', headers: { 'Authorization' => token }
+
+        expect(response.headers['Set-Cookie'].to_s).not_to include('x_connect_state')
+      end
+
       it 'x.com の認可URLも許可すること' do
-        url = 'https://x.com/i/oauth2/authorize?state=abc'
+        url = 'https://x.com/i/oauth2/authorize?state=state-abc'
         allow(DispatchClient).to receive(:start_x_connect).and_return({ 'authorize_url' => url })
 
         post '/api/admin/x/connect', headers: { 'Authorization' => token }
@@ -37,9 +58,13 @@ RSpec.describe 'Api::Admin::XConnections#create', type: :request do
       end
 
       [
-        'https://evil.example.com/i/oauth2/authorize',
-        'http://twitter.com/i/oauth2/authorize',
-        'https://twitter.com.evil.example.com/authorize',
+        'https://evil.example.com/i/oauth2/authorize?state=abc',
+        'https://twitter.com@evil.example.com/i/oauth2/authorize?state=abc',
+        'https://twitter.com%40evil.example.com/i/oauth2/authorize?state=abc',
+        'https://twitter.com/i/oauth2/authorize',
+        'https://twitter.com/i/oauth2/authorize?state=',
+        'http://twitter.com/i/oauth2/authorize?state=abc',
+        'https://twitter.com.evil.example.com/authorize?state=abc',
         'javascript:alert(1)',
         '',
         nil

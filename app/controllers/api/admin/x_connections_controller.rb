@@ -11,18 +11,17 @@ module Api
       # 管理者をフィッシングサイトへ誘導させない防御)。
       ALLOWED_AUTHORIZE_HOSTS = %w[twitter.com x.com].freeze
 
+      include XConnectStateCookie
+
       before_action :authenticate_admin!
 
       # POST /api/admin/x/connect
       def create
-        result = DispatchClient.start_x_connect
-        authorize_url = result['authorize_url']
+        authorize_url = DispatchClient.start_x_connect['authorize_url']
+        state = trusted_state_from(authorize_url)
+        return render_unexpected_authorize_url if state.nil?
 
-        unless trusted_authorize_url?(authorize_url)
-          Rails.logger.error('Api::Admin::XConnectionsController#create: unexpected authorize_url from dispatch')
-          return render json: { error: 'Failed to start X connection' }, status: :bad_gateway
-        end
-
+        bind_x_connect_state(state)
         render json: { authorize_url: authorize_url }, status: :ok
       rescue DispatchClient::ConfigurationMissing => e
         Rails.logger.info("Api::Admin::XConnectionsController#create: dispatch not configured: #{e.message}")
@@ -34,13 +33,23 @@ module Api
 
       private
 
-      def trusted_authorize_url?(value)
-        return false unless value.is_a?(String)
+      def render_unexpected_authorize_url
+        Rails.logger.error('Api::Admin::XConnectionsController#create: unexpected authorize_url from dispatch')
+        render json: { error: 'Failed to start X connection' }, status: :bad_gateway
+      end
+
+      # 認可URLが https かつ許可ホストで、state を含む場合だけその state を返す。
+      # それ以外 (想定外のURL・state なし) は nil。
+      def trusted_state_from(value)
+        return nil unless value.is_a?(String)
 
         uri = URI.parse(value)
-        uri.is_a?(URI::HTTPS) && ALLOWED_AUTHORIZE_HOSTS.include?(uri.host)
-      rescue URI::InvalidURIError
-        false
+        return nil unless uri.is_a?(URI::HTTPS) && ALLOWED_AUTHORIZE_HOSTS.include?(uri.host)
+
+        state = URI.decode_www_form(uri.query.to_s).to_h['state']
+        state.presence
+      rescue URI::InvalidURIError, ArgumentError
+        nil
       end
     end
   end

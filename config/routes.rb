@@ -23,7 +23,13 @@ Rails.application.routes.draw do
       resources :comments, only: %i[index create]
     end
 
+    # X (Twitter) OAuth のリダイレクト先。X からのブラウザ遷移は管理画面の JWT を
+    # 持てないため admin 名前空間の認証対象外 (別コントローラー)。パスは X Developer
+    # Portal の Callback URI および myblog-dispatch の X_OAUTH_REDIRECT_URI と完全一致させる。
+    get 'admin/x/callback', to: 'x_callbacks#show'
+
     namespace :admin do
+      post 'x/connect', to: 'x_connections#create'
       resources :blogs do
         collection do
           post :import_mt

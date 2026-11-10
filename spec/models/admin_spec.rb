@@ -19,9 +19,15 @@ RSpec.describe Admin, type: :model do
       expect(admin).not_to be_valid
     end
 
-    it '6文字以上のpasswordの場合有効である' do
-      admin = Admin.new(email: 'admin@example.com', password: 'long_enough_password',
-                        password_confirmation: 'long_enough_password')
+    it '11文字のpasswordの場合無効である' do
+      password = 'a' * 11
+      admin = Admin.new(email: 'admin@example.com', password: password, password_confirmation: password)
+      expect(admin).not_to be_valid
+    end
+
+    it '12文字以上のpasswordの場合有効である' do
+      password = 'a' * 12
+      admin = Admin.new(email: 'admin@example.com', password: password, password_confirmation: password)
       expect(admin).to be_valid
     end
   end

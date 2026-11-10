@@ -10,3 +10,7 @@ node_modules
 .env*
 README.md
 vendor/bundle
+
+# ローカルでビルドしたイメージに復号鍵を焼き込まない
+config/master.key
+config/credentials/*.key

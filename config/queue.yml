@@ -4,10 +4,11 @@ default: &default
       batch_size: 500
   workers:
     - queues: "*"
-      # Puma plugin で in-process 実行する構成では Web 用 puma threads と
-      # DB コネクションプールを取り合う。default DB pool=5 / Puma threads=3 だと
-      # 1 worker thread でちょうど枯渇しない計算。リセットメール等の低頻度ジョブ
-      # 用途では 1 で十分、必要なら JOB_THREADS で env 経由で上げる。
+      # Puma plugin の async モード (config/puma.rb) では Web 用 puma threads と
+      # DB コネクションプールを共有する。プールの大きさは config/database.yml で
+      # JOB_THREADS を含めて計算している。リセットメール等の低頻度ジョブ用途では
+      # 1 で十分、必要なら JOB_THREADS で env 経由で上げる。
+      # processes (JOB_CONCURRENCY) は fork モードでのみ有効 (async では無視される)。
       threads: <%= ENV.fetch("JOB_THREADS", 1) %>
       processes: <%= ENV.fetch("JOB_CONCURRENCY", 1) %>
       polling_interval: 0.1

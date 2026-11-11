@@ -17,8 +17,15 @@ tolerations:
     effect: NoSchedule
 
 steps:
+  # シークレットを参照するステップは main への push のときだけ動かす。
+  # pull_request では参照しないことで、Drone 側でシークレットの
+  # 「Allow Pull Requests」を OFF にできる (公開 repo のため、PR に渡すと
+  # fork からの PR で .drone.yml を書き換えて持ち出される恐れがある)。
   - name: check-vars
     image: alpine
+    when:
+      branch: [main]
+      event: [push]
     environment:
       AWS_REGION:
         from_secret: AWS_REGION

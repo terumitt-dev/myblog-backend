@@ -6,12 +6,12 @@ RSpec.describe 'Api::XCallbacks#show', type: :request do
   include ActiveSupport::Testing::TimeHelpers
 
   let(:admin) do
-    Admin.create!(email: 'admin@example.com', password: 'password123', password_confirmation: 'password123')
+    Admin.create!(email: 'admin@example.com', password: 'password12345', password_confirmation: 'password12345')
   end
 
   let(:token) do
     post '/api/auth/sign_in',
-         params: { admin: { email: admin.email, password: 'password123' } },
+         params: { admin: { email: admin.email, password: 'password12345' } },
          as: :json
     response.headers['Authorization']
   end

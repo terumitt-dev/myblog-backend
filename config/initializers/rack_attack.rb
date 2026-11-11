@@ -68,9 +68,45 @@ class Rack::Attack
     client_ip(req) if password_endpoint?(req) && req.patch?
   end
 
+  # ログイン・管理者登録・コメント投稿も、password と同じ理由でフォーマット拡張
+  # (.json 等) と末尾スラッシュを同一エンドポイントとして判定する。
+  SIGN_IN_ENDPOINT = %r{\A/api/auth/sign_in(?:\.[^/]+)?/?\z}
+  SIGN_UP_ENDPOINT = %r{\A/api/auth/sign_up(?:\.[^/]+)?/?\z}
+  COMMENTS_ENDPOINT = %r{\A/api/blogs/[^/]+/comments(?:\.[^/]+)?/?\z}
+
+  # ログイン: 同一IPから10分に10回まで
+  # - 管理者パスワードの総当たりを抑制
+  # - 全体 (global) の上限は置かない。置くと第三者が上限まで叩くだけで
+  #   管理者本人がログインできなくなる (ロックアウト攻撃) ため
+  throttle('sign_in/ip', limit: 10, period: 10.minutes) do |req|
+    client_ip(req) if req.post? && req.path.match?(SIGN_IN_ENDPOINT)
+  end
+
+  # 管理者登録 (合言葉 ADMIN_SIGNUP_PASSWORD の検証): 同一IPから1時間に5回まで
+  # - 応答で合言葉の正誤が分かるため、総当たりを抑制する
+  throttle('sign_up/ip', limit: 5, period: 1.hour) do |req|
+    client_ip(req) if req.post? && req.path.match?(SIGN_UP_ENDPOINT)
+  end
+
+  # 管理者登録 (全体): 1時間に20回まで
+  # - 分散IPからの合言葉の総当たりを抑制
+  # - 管理者は1人で、登録は初期構築時にしか使わないため正規利用への影響はない
+  throttle('sign_up/global', limit: 20, period: 1.hour) do |req|
+    'sign_up' if req.post? && req.path.match?(SIGN_UP_ENDPOINT)
+  end
+
+  # コメント投稿: 同一IPから10分に20回まで
+  # - Turnstile を通過した場合でも連投できる量を抑える
+  # - 無効な token での連打による Cloudflare siteverify への外部リクエスト量も抑える
+  throttle('comments/ip', limit: 20, period: 10.minutes) do |req|
+    client_ip(req) if req.post? && req.path.match?(COMMENTS_ENDPOINT)
+  end
+
   # レートリミット超過時のレスポンス
-  self.throttled_responder = lambda do |env|
-    retry_after = (env['rack.attack.match_data'] || {})[:period]
+  # throttled_responder には env ではなく Rack::Attack::Request が渡される
+  # (env を受け取るのは廃止された throttled_response の方)。
+  self.throttled_responder = lambda do |request|
+    retry_after = (request.env['rack.attack.match_data'] || {})[:period]
     [
       429,
       {

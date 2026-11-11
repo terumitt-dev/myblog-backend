@@ -4,13 +4,13 @@ require 'rails_helper'
 
 RSpec.describe 'Api::Admin::Blogs#tweet', type: :request do
   let(:admin) do
-    Admin.create!(email: 'admin@example.com', password: 'password123', password_confirmation: 'password123')
+    Admin.create!(email: 'admin@example.com', password: 'password12345', password_confirmation: 'password12345')
   end
   let!(:blog) { FactoryBot.create(:blog) }
 
   let(:token) do
     post '/api/auth/sign_in',
-         params: { admin: { email: admin.email, password: 'password123' } },
+         params: { admin: { email: admin.email, password: 'password12345' } },
          as: :json
     response.headers['Authorization']
   end

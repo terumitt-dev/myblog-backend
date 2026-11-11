@@ -22,8 +22,8 @@ RSpec.describe 'Api::Auth', type: :request do
         {
           admin: {
             email: 'newadmin@example.com',
-            password: 'password123',
-            password_confirmation: 'password123'
+            password: 'password12345',
+            password_confirmation: 'password12345'
           },
           signup_password: 'change-this-password-in-production'
         }
@@ -47,8 +47,8 @@ RSpec.describe 'Api::Auth', type: :request do
         {
           admin: {
             email: 'invalid',
-            password: 'password123',
-            password_confirmation: 'password123'
+            password: 'password12345',
+            password_confirmation: 'password12345'
           },
           signup_password: 'change-this-password-in-production'
         }
@@ -68,13 +68,13 @@ RSpec.describe 'Api::Auth', type: :request do
 
   describe 'POST /api/auth/sign_in' do
     before(:each) do
-      Admin.create!(email: 'admin@example.com', password: 'password123', password_confirmation: 'password123')
+      Admin.create!(email: 'admin@example.com', password: 'password12345', password_confirmation: 'password12345')
     end
 
     context '正常なメールアドレスとパスワードの場合' do
       it '成功レスポンスを返す' do
         post '/api/auth/sign_in',
-             params: { admin: { email: 'admin@example.com', password: 'password123' } },
+             params: { admin: { email: 'admin@example.com', password: 'password12345' } },
              as: :json
         expect(response).to have_http_status(:ok)
         expect(json_response['status']).to eq('success')
@@ -83,7 +83,7 @@ RSpec.describe 'Api::Auth', type: :request do
 
       it 'Authorization ヘッダーにJWTトークンを返す' do
         post '/api/auth/sign_in',
-             params: { admin: { email: 'admin@example.com', password: 'password123' } },
+             params: { admin: { email: 'admin@example.com', password: 'password12345' } },
              as: :json
         expect(response.headers['Authorization']).to match(/^Bearer /)
       end
@@ -92,7 +92,7 @@ RSpec.describe 'Api::Auth', type: :request do
     context '無効なメールアドレスの場合' do
       it 'エラーレスポンスを返す' do
         post '/api/auth/sign_in',
-             params: { admin: { email: 'nonexistent@example.com', password: 'password123' } },
+             params: { admin: { email: 'nonexistent@example.com', password: 'password12345' } },
              as: :json
         expect(response).to have_http_status(:unauthorized)
         expect(json_response['status']).to eq('error')
@@ -103,12 +103,12 @@ RSpec.describe 'Api::Auth', type: :request do
 
   describe 'DELETE /api/auth/sign_out' do
     before(:each) do
-      Admin.create!(email: 'admin@example.com', password: 'password123', password_confirmation: 'password123')
+      Admin.create!(email: 'admin@example.com', password: 'password12345', password_confirmation: 'password12345')
     end
 
     let(:token) do
       post '/api/auth/sign_in',
-           params: { admin: { email: 'admin@example.com', password: 'password123' } },
+           params: { admin: { email: 'admin@example.com', password: 'password12345' } },
            as: :json
       response.headers['Authorization']
     end
@@ -151,12 +151,12 @@ RSpec.describe 'Api::Auth', type: :request do
 
   describe 'GET /api/auth/current_user' do
     before(:each) do
-      Admin.create!(email: 'admin@example.com', password: 'password123', password_confirmation: 'password123')
+      Admin.create!(email: 'admin@example.com', password: 'password12345', password_confirmation: 'password12345')
     end
 
     let(:token) do
       post '/api/auth/sign_in',
-           params: { admin: { email: 'admin@example.com', password: 'password123' } },
+           params: { admin: { email: 'admin@example.com', password: 'password12345' } },
            as: :json
       response.headers['Authorization']
     end

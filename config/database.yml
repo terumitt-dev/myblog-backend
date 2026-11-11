@@ -23,7 +23,9 @@ default: &default
   password: <%= ENV.fetch("DATABASE_PASSWORD", "password") %>
   # For details on connection pooling, see Rails configuration guide
   # https://guides.rubyonrails.org/configuring.html#database-pooling
-  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+  # SolidQueue を Puma プロセス内 (async) で動かすため、Puma のスレッドに加えて
+  # ジョブ実行スレッドと SolidQueue のポーリング / ハートビート分を確保する。
+  pool: <%= ENV.fetch("DB_POOL") { ENV.fetch("RAILS_MAX_THREADS", 3).to_i + ENV.fetch("JOB_THREADS", 1).to_i + 5 } %>
 
 development:
   <<: *default

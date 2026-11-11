@@ -53,7 +53,19 @@ production_envs = [ENV['RAILS_ENV'], ENV['RACK_ENV']].compact
 solid_queue_in_puma_enabled =
   %w[1 true yes on].include?(ENV['SOLID_QUEUE_IN_PUMA'].to_s.downcase)
 
-plugin :solid_queue if production_envs.include?('production') || solid_queue_in_puma_enabled
+if production_envs.include?('production') || solid_queue_in_puma_enabled
+  plugin :solid_queue
+
+  # SolidQueue を Puma プロセス内のスレッドで動かす (async)。
+  # 既定の fork だと supervisor / worker / dispatcher / scheduler が別プロセスになり、
+  # Puma と合わせて 5 プロセスがそれぞれ Rails を抱える。本番のメモリ上限 (384Mi) を
+  # 起動直後からほぼ使い切り、約20分で応答不能 → liveness probe による再起動を
+  # 繰り返していた (2026-11)。ジョブはリセットメールとツイート通知だけなので、
+  # プロセス分離は不要。問題が出た場合は SOLID_QUEUE_MODE=fork で元に戻せる。
+  # async ではジョブ用スレッドも Puma と同じ DB コネクションプールを使うため、
+  # config/database.yml の pool をその分だけ広げている。
+  solid_queue_mode ENV.fetch('SOLID_QUEUE_MODE', 'async')
+end
 
 # Specify the PID file. Defaults to tmp/pids/server.pid in development.
 # In other environments, only set the PID file if requested.

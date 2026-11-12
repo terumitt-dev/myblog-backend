@@ -1,7 +1,7 @@
 # ============================================
 # Stage 1: Build
 # ============================================
-FROM ruby:3.2.11-bookworm AS build
+FROM ruby:4.0.9-bookworm AS build
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
@@ -25,7 +25,7 @@ ENV RAILS_ENV=production
 # ============================================
 # Stage 2: Runtime
 # ============================================
-FROM ruby:3.2.11-slim-bookworm
+FROM ruby:4.0.9-slim-bookworm
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \

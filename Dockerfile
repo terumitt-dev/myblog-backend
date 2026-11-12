@@ -1,4 +1,4 @@
-FROM ruby:3.2.11-bookworm
+FROM ruby:4.0.9-bookworm
 
 RUN apt-get update && apt-get install -y nodejs postgresql-client libvips-dev --no-install-recommends && rm -rf /var/lib/apt/lists/*
 

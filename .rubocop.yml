@@ -9,7 +9,9 @@ plugins:
   - rubocop-rspec_rails
 
 AllCops:
-  TargetRubyVersion: 3.2
+  # 実行環境は Ruby 4.0 だが、Gemfile.lock の RuboCop は 4.0 を指定できない (3.5 まで) ため 3.4 にしている。
+  # RuboCop を更新したら 4.0 に上げる。
+  TargetRubyVersion: 3.4
   NewCops: enable
   Exclude:
     - "bin/*"

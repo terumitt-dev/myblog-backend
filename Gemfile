@@ -3,10 +3,10 @@
 source 'https://rubygems.org'
 git_source(:github) { |repo| "https://github.com/#{repo}.git" }
 
-ruby '3.2.11'
+ruby '4.0.9'
 
 # Rails 8
-gem 'rails', '~> 8.0'
+gem 'rails', '~> 8.1'
 
 # Asset pipeline
 gem 'sprockets-rails', '~> 3.4' # Rails 8 対応版で最新
@@ -52,14 +52,17 @@ gem 'aws-sdk-s3', require: false
 gem 'image_processing', '~> 1.2'
 
 # Windows 専用
-gem 'tzinfo-data', platforms: %i[mingw mswin x64_mingw jruby]
+gem 'tzinfo-data', platforms: %i[windows jruby]
 
 # Boot & logger
 gem 'bootsnap', '~> 1.16', require: false
 gem 'logger', '~> 1.7'
+# MT 形式インポートの文字コード変換 (app/models/blog.rb) で使用。
+# Ruby 3.4 から標準添付 (default gem) ではなくなったため、明示的に依存に加える。
+gem 'nkf', '~> 0.2'
 
 group :development, :test do
-  gem 'debug', platforms: %i[mri mingw x64_mingw]
+  gem 'debug', platforms: %i[mri windows]
   gem 'rspec-rails', '~> 6.0'
   gem 'rubocop', require: false
   gem 'rubocop-capybara', require: false

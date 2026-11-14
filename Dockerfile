@@ -5,6 +5,6 @@ RUN apt-get update && apt-get install -y nodejs postgresql-client libvips-dev --
 WORKDIR /myblog
 
 COPY Gemfile Gemfile.lock ./
-RUN gem install bundler && bundle config --global frozen 1 && bundle install
+RUN gem install bundler && bundle config set --global frozen 1 && bundle install
 
 ENV PATH="/usr/local/bundle/bin:${PATH}"

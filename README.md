@@ -116,7 +116,8 @@ comments
 admins
 ├── email        : string（Devise）
 ├── encrypted_password
-└── reset_password_token / reset_password_sent_at
+├── reset_password_token / reset_password_sent_at
+└── remember_created_at
 
 jwt_blacklists
 ├── jti          : string（トークン識別子）
@@ -262,17 +263,21 @@ bundle exec rspec spec/requests/api/auth_spec.rb
 - **サービステスト**: ImageDownloader / TurnstileService / DispatchClient
 - **ジョブテスト**: TweetNotificationJob
 
-テストには PostgreSQL が必要です。手元に Ruby 4.0 が無い場合は、コンテナ内で実行できます。
+テストには PostgreSQL が必要です。手元に Ruby 4.0 が無い場合は、コンテナ内で実行できます。DB とテスト用のコンテナを同じ Docker ネットワークに置くので、Docker Desktop でも Linux の Docker Engine でも同じ手順で動きます。
 
 ```bash
-docker run -d --name myblog-test-pg -e POSTGRES_PASSWORD=password -p 55439:5432 postgres:18-alpine
+docker network create myblog-test
+docker run -d --name myblog-test-pg --network myblog-test -e POSTGRES_PASSWORD=password postgres:18-alpine
 
-docker run --rm -v "$PWD":/w -w /w \
-  -e RAILS_ENV=test -e DATABASE_HOST=host.docker.internal -e DATABASE_PORT=55439 \
+docker run --rm --network myblog-test -v "$PWD":/w -w /w \
+  -e RAILS_ENV=test -e DATABASE_HOST=myblog-test-pg \
   -e DATABASE_USERNAME=postgres -e DATABASE_PASSWORD=password \
   ruby:4.0.9-bookworm sh -c '
     apt-get update -qq && apt-get install -y -qq libvips-dev &&
     bundle install && bin/rails db:create db:schema:load && bundle exec rspec'
+
+# 後片付け
+docker rm -f myblog-test-pg && docker network rm myblog-test
 ```
 
 ## デプロイ
